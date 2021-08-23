@@ -1,11 +1,17 @@
 defmodule BeamFileTest do
   use ExUnit.Case
 
-  @math_abstract_code Code.eval_file("test/fixtures/math_abstract_code.exs") |> elem(0)
   @math_debug_info Code.eval_file("test/fixtures/math_debug_info.exs") |> elem(0)
-  @math_erl_code Code.eval_file("test/fixtures/math_erl_code.exs") |> elem(0)
+  @math_abstract_code %{
+    "1.11.4" => Code.eval_file("test/fixtures/1.11.4/math_abstract_code.exs") |> elem(0),
+    "1.10.4" => Code.eval_file("test/fixtures/1.10.4/math_abstract_code.exs") |> elem(0)
+  }
+  @math_erl_code %{
+    "1.11.4" => Code.eval_file("test/fixtures/1.11.4/math_erl_code.exs") |> elem(0),
+    "1.10.4" => Code.eval_file("test/fixtures/1.10.4/math_erl_code.exs") |> elem(0)
+  }
 
-  describe "which/1" do
+  describe("which/1") do
     test "returns the path to the given module" do
       assert {:ok, path} = BeamFile.which(Math)
       assert path =~ "beam_file/_build/test/lib/beam_file/ebin/Elixir.Math.beam"
@@ -17,7 +23,7 @@ defmodule BeamFileTest do
   end
 
   test "abstract_code/1" do
-    assert BeamFile.abstract_code(Math) == @math_abstract_code
+    assert BeamFile.abstract_code(Math) == Map.fetch!(@math_abstract_code, System.version())
   end
 
   test "info/1" do
@@ -26,12 +32,12 @@ defmodule BeamFileTest do
     assert info[:module] == Math
 
     assert [
-             {'AtU8', 20, 209},
-             {'Code', 240, 309},
-             {'StrT', 560, 0},
-             {'ImpT', 568, 88},
-             {'ExpT', 664, 112},
-             {'LitT', 784, 105},
+             {'AtU8', _, _},
+             {'Code', _, _},
+             {'StrT', _, _},
+             {'ImpT', _, _},
+             {'ExpT', _, _},
+             {'LitT', _, _},
              {'LocT', _, _},
              {'Attr', _, _},
              {'CInf', _, _},
@@ -77,7 +83,9 @@ defmodule BeamFileTest do
   end
 
   test "erl_code/1" do
-    assert BeamFile.erl_code(Math) == @math_erl_code
+    {:ok, erl} = BeamFile.erl_code(Math)
+    IO.puts(erl)
+    assert BeamFile.erl_code(Math) == Map.get(@math_erl_code, System.version())
   end
 
   test "byte_code/1" do
@@ -85,29 +93,57 @@ defmodule BeamFileTest do
     assert elem(byte_code, 0) == :beam_file
     assert elem(byte_code, 1) == Math
 
-    assert elem(byte_code, 2) == [
-             {:__info__, 1, 2},
-             {:add, 2, 11},
-             {:divide, 2, 13},
-             {:double, 1, 15},
-             {:module_info, 0, 24},
-             {:module_info, 1, 26},
-             {:odd_or_even, 1, 17},
-             {:pi, 0, 20},
-             {:triple, 1, 22}
-           ]
+    case System.version() do
+      "1.11.4" ->
+        assert elem(byte_code, 2) == [
+                 {:__info__, 1, 2},
+                 {:add, 2, 11},
+                 {:divide, 2, 13},
+                 {:double, 1, 15},
+                 {:module_info, 0, 24},
+                 {:module_info, 1, 26},
+                 {:odd_or_even, 1, 17},
+                 {:pi, 0, 20},
+                 {:triple, 1, 22}
+               ]
 
-    assert elem(byte_code, 5) |> Enum.at(2) ==
-             {:function, :add, 2, 11,
-              [
-                {:line, 2},
-                {:label, 10},
-                {:func_info, {:atom, Math}, {:atom, :add}, 2},
-                {:label, 11},
-                {:line, 3},
-                {:gc_bif, :+, {:f, 0}, 2, [x: 0, x: 1], {:x, 0}},
-                :return
-              ]}
+        assert elem(byte_code, 5) |> Enum.at(2) ==
+                 {:function, :add, 2, 11,
+                  [
+                    {:line, 2},
+                    {:label, 10},
+                    {:func_info, {:atom, Math}, {:atom, :add}, 2},
+                    {:label, 11},
+                    {:line, 3},
+                    {:gc_bif, :+, {:f, 0}, 2, [x: 0, x: 1], {:x, 0}},
+                    :return
+                  ]}
+
+      "1.10.4" ->
+        assert elem(byte_code, 2) == [
+                 {:__info__, 1, 2},
+                 {:add, 2, 10},
+                 {:divide, 2, 12},
+                 {:double, 1, 14},
+                 {:module_info, 0, 23},
+                 {:module_info, 1, 25},
+                 {:odd_or_even, 1, 16},
+                 {:pi, 0, 19},
+                 {:triple, 1, 21}
+               ]
+
+        assert elem(byte_code, 5) |> Enum.at(2) ==
+                 {:function, :add, 2, 10,
+                  [
+                    {:line, 2},
+                    {:label, 9},
+                    {:func_info, {:atom, Math}, {:atom, :add}, 2},
+                    {:label, 10},
+                    {:line, 3},
+                    {:gc_bif, :+, {:f, 0}, 2, [x: 0, x: 1], {:x, 0}},
+                    :return
+                  ]}
+    end
   end
 
   test "docs/1" do
